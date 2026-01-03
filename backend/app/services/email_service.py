@@ -1,9 +1,9 @@
 """
 Email Service for SPHERE
-Handles sending 2FA codes and notifications
+Handles sending 2FA codes and notifications via Gmail SMTP
 """
 
-import aiosmtplib
+import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
@@ -11,15 +11,15 @@ import os
 
 
 class EmailService:
-    """Handles email sending for 2FA and notifications"""
+    """Handles email sending for 2FA and notifications via Gmail SMTP"""
     
     def __init__(self):
-        # Email configuration (use environment variables in production)
+        # Email configuration from environment variables
         self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
         self.smtp_user = os.getenv("SMTP_USER", "")
         self.smtp_password = os.getenv("SMTP_PASSWORD", "")
-        self.from_email = os.getenv("FROM_EMAIL", "noreply@sphere-health.com")
+        self.from_email = os.getenv("SMTP_USER", "")  # Use SMTP_USER as from email for Gmail
         self.from_name = "SPHERE Health System"
     
     async def send_email(
@@ -30,7 +30,7 @@ class EmailService:
         body_html: Optional[str] = None
     ) -> bool:
         """
-        Send email
+        Send email via Gmail SMTP
         
         Args:
             to_email: Recipient email address
@@ -42,6 +42,17 @@ class EmailService:
             True if successful, False otherwise
         """
         try:
+            # Check if SMTP credentials are configured
+            if not self.smtp_user or not self.smtp_password:
+                print(f"\n{'='*60}")
+                print(f"⚠️  SMTP not configured - Printing email to console")
+                print(f"EMAIL TO: {to_email}")
+                print(f"SUBJECT: {subject}")
+                print(f"{'='*60}")
+                print(body_text)
+                print(f"{'='*60}\n")
+                return True
+            
             # Create message
             message = MIMEMultipart('alternative')
             message['From'] = f"{self.from_name} <{self.from_email}>"
@@ -55,18 +66,24 @@ class EmailService:
             if body_html:
                 message.attach(MIMEText(body_html, 'html'))
             
-            # For development: just print the code to console
-            print(f"\n{'='*60}")
-            print(f"EMAIL TO: {to_email}")
-            print(f"SUBJECT: {subject}")
-            print(f"{'='*60}")
-            print(body_text)
-            print(f"{'='*60}\n")
+            # Send via Gmail SMTP
+            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                server.starttls()  # Enable TLS encryption
+                server.login(self.smtp_user, self.smtp_password)
+                server.send_message(message)
             
+            print(f"✅ Email sent successfully to {to_email}")
             return True
             
+        except smtplib.SMTPAuthenticationError as e:
+            print(f"❌ SMTP Authentication Error: {e}")
+            print("   Make sure you're using a Gmail App Password, not your regular password")
+            return False
+        except smtplib.SMTPException as e:
+            print(f"❌ SMTP Error: {e}")
+            return False
         except Exception as e:
-            print(f"Error preparing email: {e}")
+            print(f"❌ Error sending email: {e}")
             return False
     
     async def send_2fa_code(self, to_email: str, code: str) -> bool:

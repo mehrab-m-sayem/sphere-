@@ -67,3 +67,52 @@ class LoginResponse(BaseModel):
 class TwoFAVerify(BaseModel):
     temp_token: str
     code: str
+
+
+class DoctorPublicInfo(BaseModel):
+    """Public doctor information visible to patients"""
+    id: int
+    name: str
+    specialization: Optional[str]
+    
+    class Config:
+        from_attributes = True
+
+
+# ===== Appointment Schemas =====
+
+class AppointmentCreate(BaseModel):
+    """Schema for creating an appointment"""
+    doctor_id: int
+    appointment_date: str  # Format: YYYY-MM-DD
+    appointment_time: str  # Format: HH:MM
+    reason: str
+
+
+class AppointmentUpdate(BaseModel):
+    """Schema for updating an appointment"""
+    status: Optional[str] = None  # pending, confirmed, completed, cancelled
+    notes: Optional[str] = None  # Doctor's notes
+    appointment_date: Optional[str] = None
+    appointment_time: Optional[str] = None
+
+
+class AppointmentResponse(BaseModel):
+    """Schema for appointment response"""
+    id: int
+    patient_id: int
+    doctor_id: int
+    patient_name: Optional[str] = None
+    doctor_name: Optional[str] = None
+    doctor_specialization: Optional[str] = None
+    appointment_date: Optional[str]
+    appointment_time: Optional[str]
+    reason: Optional[str]
+    notes: Optional[str] = None
+    status: str
+    integrity_verified: bool = True
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True

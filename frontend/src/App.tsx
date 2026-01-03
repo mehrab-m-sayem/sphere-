@@ -6,6 +6,9 @@ import LoginPage from './pages/LoginPage';
 import TwoFactorPage from './pages/TwoFactorPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminDashboard from './pages/AdminDashboard';
+import DoctorsListPage from './pages/DoctorsListPage';
+import BookAppointmentPage from './pages/BookAppointmentPage';
+import AppointmentsPage from './pages/AppointmentsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -22,6 +25,33 @@ function App() {
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/doctors" 
+          element={
+            <ProtectedRoute>
+              <DoctorsListPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/book-appointment/:doctorId" 
+          element={
+            <ProtectedRoute>
+              <BookAppointmentPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/appointments" 
+          element={
+            <ProtectedRoute>
+              <AppointmentsPage />
             </ProtectedRoute>
           } 
         />

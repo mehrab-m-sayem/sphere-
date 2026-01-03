@@ -114,6 +114,31 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* View Doctors - available to patients only */}
+              {profile.role === 'patient' && (
+                <>
+                  <button
+                    onClick={() => navigate('/doctors')}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium"
+                  >
+                    View Doctors
+                  </button>
+                  <button
+                    onClick={() => navigate('/appointments')}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+                  >
+                    My Appointments
+                  </button>
+                </>
+              )}
+              {profile.role === 'doctor' && (
+                <button
+                  onClick={() => navigate('/appointments')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+                >
+                  My Appointments
+                </button>
+              )}
               {profile.role === 'admin' && (
                 <button
                   onClick={() => navigate('/admin')}

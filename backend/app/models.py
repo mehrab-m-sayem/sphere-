@@ -2,13 +2,22 @@
 Database Models for SPHERE
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
 from app.database import Base
 from app.crypto.rsa import RSA
 from app.crypto.ecc import ECC
 import hashlib
+import json
+import os
+import hmac
+from pathlib import Path
+
+
+# HMAC key for Message Authentication Codes
+HMAC_KEY = os.getenv("HMAC_SECRET_KEY", "sphere-hmac-secret-key-change-in-production").encode()
 
 
 class User(Base):
@@ -52,22 +61,98 @@ class User(Base):
     # Initialize RSA and ECC globally (one instance per app)
     _rsa_instance = None
     _ecc_instance = None
+    _keys_dir = Path(__file__).parent.parent / "keys"
+    
+    @classmethod
+    def _ensure_keys_dir(cls):
+        """Ensure keys directory exists"""
+        cls._keys_dir.mkdir(exist_ok=True)
+    
+    @classmethod
+    def _save_rsa_keys(cls, rsa_instance):
+        """Save RSA keys to file for persistence"""
+        cls._ensure_keys_dir()
+        keys_file = cls._keys_dir / "rsa_keys.json"
+        keys_data = {
+            "public_key": {"e": rsa_instance.public_key[0], "n": rsa_instance.public_key[1]},
+            "private_key": {"d": rsa_instance.private_key[0], "n": rsa_instance.private_key[1]}
+        }
+        with open(keys_file, 'w') as f:
+            json.dump(keys_data, f)
+        print(f"✅ RSA keys saved to {keys_file}")
+    
+    @classmethod
+    def _load_rsa_keys(cls, rsa_instance) -> bool:
+        """Load RSA keys from file. Returns True if loaded successfully."""
+        keys_file = cls._keys_dir / "rsa_keys.json"
+        if keys_file.exists():
+            try:
+                with open(keys_file, 'r') as f:
+                    keys_data = json.load(f)
+                rsa_instance.public_key = (keys_data["public_key"]["e"], keys_data["public_key"]["n"])
+                rsa_instance.private_key = (keys_data["private_key"]["d"], keys_data["private_key"]["n"])
+                print(f"✅ RSA keys loaded from {keys_file}")
+                return True
+            except Exception as e:
+                print(f"⚠️ Error loading RSA keys: {e}")
+        return False
+    
+    @classmethod
+    def _save_ecc_keys(cls, ecc_instance):
+        """Save ECC keys to file for persistence"""
+        cls._ensure_keys_dir()
+        keys_file = cls._keys_dir / "ecc_keys.json"
+        keys_data = {
+            "public_key": {"x": ecc_instance.public_key.x, "y": ecc_instance.public_key.y},
+            "private_key": ecc_instance.private_key
+        }
+        with open(keys_file, 'w') as f:
+            json.dump(keys_data, f)
+        print(f"✅ ECC keys saved to {keys_file}")
+    
+    @classmethod
+    def _load_ecc_keys(cls, ecc_instance) -> bool:
+        """Load ECC keys from file. Returns True if loaded successfully."""
+        keys_file = cls._keys_dir / "ecc_keys.json"
+        if keys_file.exists():
+            try:
+                with open(keys_file, 'r') as f:
+                    keys_data = json.load(f)
+                from app.crypto.ecc import Point
+                ecc_instance.public_key = Point(
+                    keys_data["public_key"]["x"],
+                    keys_data["public_key"]["y"],
+                    ecc_instance.curve
+                )
+                ecc_instance.private_key = keys_data["private_key"]
+                print(f"✅ ECC keys loaded from {keys_file}")
+                return True
+            except Exception as e:
+                print(f"⚠️ Error loading ECC keys: {e}")
+        return False
     
     @classmethod
     def get_rsa_instance(cls):
-        """Get or create RSA instance"""
+        """Get or create RSA instance with persistent keys"""
         if cls._rsa_instance is None:
             cls._rsa_instance = RSA(key_size=2048)
-            # Generate keypair immediately
-            cls._rsa_instance.generate_keypair()
+            # Try to load existing keys, otherwise generate new ones
+            if not cls._load_rsa_keys(cls._rsa_instance):
+                print("🔑 Generating new RSA keys...")
+                cls._rsa_instance.generate_keypair()
+                cls._save_rsa_keys(cls._rsa_instance)
         return cls._rsa_instance
     
     @classmethod
     def get_ecc_instance(cls):
-        """Get or create ECC instance"""
+        """Get or create ECC instance with persistent keys"""
         if cls._ecc_instance is None:
             cls._ecc_instance = ECC()
-            cls._ecc_instance.generate_keypair()
+            # Try to load existing keys, otherwise generate new ones
+            if not cls._load_ecc_keys(cls._ecc_instance):
+                print("🔑 Generating new ECC keys...")
+                cls._ecc_instance.generate_keypair()
+                cls._save_ecc_keys(cls._ecc_instance)
         return cls._ecc_instance
     
     # ===== RSA Encrypted Fields (Username, Email, Name, Contact) =====
@@ -230,3 +315,156 @@ class User(Base):
                 self.sex_encrypted = ecc.encrypt(value, ecc.public_key)
             except Exception as e:
                 print(f"Error encrypting sex: {e}")
+
+
+class Appointment(Base):
+    """
+    Appointment Model with Encrypted Fields
+    Uses RSA for sensitive fields and HMAC for integrity verification
+    """
+    __tablename__ = "appointments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Foreign keys (not encrypted - needed for querying)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    doctor_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    
+    # Encrypted fields using RSA (reason/notes for appointment)
+    reason_encrypted = Column(Text, nullable=False)  # RSA encrypted
+    notes_encrypted = Column(Text, nullable=True)  # RSA encrypted (doctor's notes)
+    
+    # Appointment details (encrypted with ECC)
+    appointment_date_encrypted = Column(Text, nullable=False)  # ECC encrypted
+    appointment_time_encrypted = Column(Text, nullable=False)  # ECC encrypted
+    
+    # Status (not encrypted - needed for filtering)
+    # pending, confirmed, completed, cancelled
+    status = Column(String(20), default="pending")
+    
+    # HMAC for data integrity verification
+    data_hmac = Column(String(64), nullable=False)
+    
+    # Timestamps
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    patient = relationship("User", foreign_keys=[patient_id], backref="patient_appointments")
+    doctor = relationship("User", foreign_keys=[doctor_id], backref="doctor_appointments")
+    
+    @staticmethod
+    def compute_hmac(patient_id: int, doctor_id: int, reason: str, date: str, time: str) -> str:
+        """
+        Compute HMAC for data integrity verification
+        Uses HMAC-SHA256 to detect unauthorized modifications
+        """
+        data = f"{patient_id}:{doctor_id}:{reason}:{date}:{time}"
+        return hmac.new(HMAC_KEY, data.encode(), hashlib.sha256).hexdigest()
+    
+    def verify_integrity(self) -> bool:
+        """Verify data integrity using HMAC"""
+        try:
+            computed_hmac = self.compute_hmac(
+                self.patient_id,
+                self.doctor_id,
+                self.reason,
+                self.appointment_date,
+                self.appointment_time
+            )
+            return hmac.compare_digest(self.data_hmac, computed_hmac)
+        except Exception as e:
+            print(f"Error verifying HMAC: {e}")
+            return False
+    
+    # ===== RSA Encrypted Fields =====
+    
+    @property
+    def reason(self):
+        """Decrypt reason using RSA"""
+        if self.reason_encrypted:
+            try:
+                rsa = User.get_rsa_instance()
+                return rsa.decrypt(self.reason_encrypted, rsa.private_key)
+            except Exception as e:
+                print(f"Error decrypting reason: {e}")
+                return None
+        return None
+    
+    @reason.setter
+    def reason(self, value):
+        """Encrypt reason using RSA"""
+        if value:
+            try:
+                rsa = User.get_rsa_instance()
+                self.reason_encrypted = rsa.encrypt(value, rsa.public_key)
+            except Exception as e:
+                print(f"Error encrypting reason: {e}")
+    
+    @property
+    def notes(self):
+        """Decrypt notes using RSA"""
+        if self.notes_encrypted:
+            try:
+                rsa = User.get_rsa_instance()
+                return rsa.decrypt(self.notes_encrypted, rsa.private_key)
+            except Exception as e:
+                print(f"Error decrypting notes: {e}")
+                return None
+        return None
+    
+    @notes.setter
+    def notes(self, value):
+        """Encrypt notes using RSA"""
+        if value:
+            try:
+                rsa = User.get_rsa_instance()
+                self.notes_encrypted = rsa.encrypt(value, rsa.public_key)
+            except Exception as e:
+                print(f"Error encrypting notes: {e}")
+    
+    # ===== ECC Encrypted Fields =====
+    
+    @property
+    def appointment_date(self):
+        """Decrypt appointment date using ECC"""
+        if self.appointment_date_encrypted:
+            try:
+                ecc = User.get_ecc_instance()
+                return ecc.decrypt(self.appointment_date_encrypted, ecc.private_key)
+            except Exception as e:
+                print(f"Error decrypting appointment_date: {e}")
+                return None
+        return None
+    
+    @appointment_date.setter
+    def appointment_date(self, value):
+        """Encrypt appointment date using ECC"""
+        if value:
+            try:
+                ecc = User.get_ecc_instance()
+                self.appointment_date_encrypted = ecc.encrypt(value, ecc.public_key)
+            except Exception as e:
+                print(f"Error encrypting appointment_date: {e}")
+    
+    @property
+    def appointment_time(self):
+        """Decrypt appointment time using ECC"""
+        if self.appointment_time_encrypted:
+            try:
+                ecc = User.get_ecc_instance()
+                return ecc.decrypt(self.appointment_time_encrypted, ecc.private_key)
+            except Exception as e:
+                print(f"Error decrypting appointment_time: {e}")
+                return None
+        return None
+    
+    @appointment_time.setter
+    def appointment_time(self, value):
+        """Encrypt appointment time using ECC"""
+        if value:
+            try:
+                ecc = User.get_ecc_instance()
+                self.appointment_time_encrypted = ecc.encrypt(value, ecc.public_key)
+            except Exception as e:
+                print(f"Error encrypting appointment_time: {e}")

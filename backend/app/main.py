@@ -5,9 +5,14 @@ from fastapi.responses import FileResponse
 import os
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from app.database import engine, Base
 from app.routers import auth, users, admin
+from app.routers import appointments
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -27,6 +32,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(admin.router)
+app.include_router(appointments.router)
 
 @app.get("/api/health")
 async def health_check():
