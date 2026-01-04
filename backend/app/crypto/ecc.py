@@ -5,8 +5,10 @@ Using secp256k1 curve parameters
 """
 
 import random
-import hashlib
 from typing import Tuple, Optional
+
+# Import SHA256 implementation from mac module
+# We use late import in methods to avoid circular import issues
 
 
 class Point:
@@ -183,9 +185,13 @@ class ECC:
         Encrypt plaintext using ECC (ElGamal-style encryption)
         Returns: encrypted string in format "c1x,c1y,c2_hex"
         """
+        # Import SHA256 here to avoid circular import
+        from .mac import SHA256
+        sha256 = SHA256()
+        
         # Convert plaintext to integer
         plaintext_bytes = plaintext.encode('utf-8')
-        plaintext_hash = hashlib.sha256(plaintext_bytes).digest()
+        plaintext_hash = sha256.hash(plaintext_bytes)
         m = int.from_bytes(plaintext_hash[:16], byteorder='big')  # Use first 128 bits
         
         # Generate random k
@@ -198,10 +204,10 @@ class ECC:
         # We'll encode message in x-coordinate
         shared_secret = public_key.scalar_multiply(k)
         
-        # Derive encryption key from shared secret
-        key_bytes = hashlib.sha256(
+        # Derive encryption key from shared secret using custom SHA256
+        key_bytes = sha256.hash(
             str(shared_secret.x).encode() + str(shared_secret.y).encode()
-        ).digest()
+        )
         
         # XOR plaintext with key (stream cipher style)
         encrypted_bytes = bytes(a ^ b for a, b in zip(plaintext_bytes, key_bytes * (len(plaintext_bytes) // len(key_bytes) + 1)))
@@ -214,6 +220,10 @@ class ECC:
         """
         Decrypt ciphertext using ECC private key
         """
+        # Import SHA256 here to avoid circular import
+        from .mac import SHA256
+        sha256 = SHA256()
+        
         parts = ciphertext.split(',')
         c1_x = int(parts[0])
         c1_y = int(parts[1])
@@ -225,10 +235,10 @@ class ECC:
         # Calculate shared secret: private_key * C1
         shared_secret = C1.scalar_multiply(private_key)
         
-        # Derive decryption key
-        key_bytes = hashlib.sha256(
+        # Derive decryption key using custom SHA256
+        key_bytes = sha256.hash(
             str(shared_secret.x).encode() + str(shared_secret.y).encode()
-        ).digest()
+        )
         
         # Decrypt
         encrypted_bytes = bytes.fromhex(c2_hex)
@@ -241,8 +251,12 @@ class ECC:
         Create digital signature using ECDSA
         Returns: (r, s) signature tuple
         """
-        # Hash the message
-        hash_bytes = hashlib.sha256(message.encode()).digest()
+        # Import SHA256 here to avoid circular import
+        from .mac import SHA256
+        sha256 = SHA256()
+        
+        # Hash the message using custom SHA256
+        hash_bytes = sha256.hash(message.encode())
         z = int.from_bytes(hash_bytes, byteorder='big')
         
         while True:
@@ -271,14 +285,18 @@ class ECC:
         """
         Verify digital signature using ECDSA
         """
+        # Import SHA256 here to avoid circular import
+        from .mac import SHA256
+        sha256 = SHA256()
+        
         r, s = signature
         
         # Check if r and s are in valid range
         if not (1 <= r < self.curve.n and 1 <= s < self.curve.n):
             return False
         
-        # Hash the message
-        hash_bytes = hashlib.sha256(message.encode()).digest()
+        # Hash the message using custom SHA256
+        hash_bytes = sha256.hash(message.encode())
         z = int.from_bytes(hash_bytes, byteorder='big')
         
         # Calculate w = s^-1 mod n

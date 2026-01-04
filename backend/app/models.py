@@ -9,15 +9,17 @@ from datetime import datetime
 from app.database import Base
 from app.crypto.rsa import RSA
 from app.crypto.ecc import ECC
-import hashlib
+from app.crypto.mac import HMAC, SHA256
 import json
 import os
-import hmac
 from pathlib import Path
 
 
-# HMAC key for Message Authentication Codes
-HMAC_KEY = os.getenv("HMAC_SECRET_KEY", "sphere-hmac-secret-key-change-in-production").encode()
+# HMAC key for Message Authentication Codes (used with custom HMAC implementation)
+HMAC_KEY = os.getenv("HMAC_SECRET_KEY", "sphere-hmac-secret-key-change-in-production")
+
+# Custom SHA256 instance for hashing (search indexes)
+_sha256 = SHA256()
 
 
 class User(Base):
@@ -176,7 +178,7 @@ class User(Base):
             try:
                 rsa = self.get_rsa_instance()
                 self.username_encrypted = rsa.encrypt(value, rsa.public_key)
-                self.username_hash = hashlib.sha256(value.encode()).hexdigest()
+                self.username_hash = _sha256.hash_hex(value)
             except Exception as e:
                 print(f"Error encrypting username: {e}")
     
@@ -199,7 +201,7 @@ class User(Base):
             try:
                 rsa = self.get_rsa_instance()
                 self.email_encrypted = rsa.encrypt(value, rsa.public_key)
-                self.email_hash = hashlib.sha256(value.encode()).hexdigest()
+                self.email_hash = _sha256.hash_hex(value)
             except Exception as e:
                 print(f"Error encrypting email: {e}")
     
@@ -357,13 +359,14 @@ class Appointment(Base):
     def compute_hmac(patient_id: int, doctor_id: int, reason: str, date: str, time: str) -> str:
         """
         Compute HMAC for data integrity verification
-        Uses HMAC-SHA256 to detect unauthorized modifications
+        Uses custom HMAC-SHA256 implementation (from scratch) to detect unauthorized modifications
         """
         data = f"{patient_id}:{doctor_id}:{reason}:{date}:{time}"
-        return hmac.new(HMAC_KEY, data.encode(), hashlib.sha256).hexdigest()
+        hmac_instance = HMAC(HMAC_KEY)
+        return hmac_instance.compute_hex(data)
     
     def verify_integrity(self) -> bool:
-        """Verify data integrity using HMAC"""
+        """Verify data integrity using custom HMAC implementation"""
         try:
             computed_hmac = self.compute_hmac(
                 self.patient_id,
@@ -372,7 +375,9 @@ class Appointment(Base):
                 self.appointment_date,
                 self.appointment_time
             )
-            return hmac.compare_digest(self.data_hmac, computed_hmac)
+            # Constant-time comparison to prevent timing attacks
+            hmac_instance = HMAC(HMAC_KEY)
+            return hmac_instance.verify(f"{self.patient_id}:{self.doctor_id}:{self.reason}:{self.appointment_date}:{self.appointment_time}", self.data_hmac)
         except Exception as e:
             print(f"Error verifying HMAC: {e}")
             return False
@@ -512,21 +517,18 @@ class Diagnosis(Base):
     def compute_hmac(doctor_id: int, patient_id: int, diagnosis: str, prescription: str = "") -> str:
         """
         Compute HMAC for data integrity verification
-        Uses HMAC-SHA256 to detect unauthorized modifications
+        Uses custom HMAC-SHA256 implementation (from scratch) to detect unauthorized modifications
         """
         data = f"{doctor_id}:{patient_id}:{diagnosis}:{prescription}"
-        return hmac.new(HMAC_KEY, data.encode(), hashlib.sha256).hexdigest()
+        hmac_instance = HMAC(HMAC_KEY)
+        return hmac_instance.compute_hex(data)
     
     def verify_integrity(self) -> bool:
-        """Verify data integrity using HMAC"""
+        """Verify data integrity using custom HMAC implementation"""
         try:
-            computed_hmac = self.compute_hmac(
-                self.doctor_id,
-                self.patient_id,
-                self.diagnosis or "",
-                self.prescription or ""
-            )
-            return hmac.compare_digest(self.data_hmac, computed_hmac)
+            data = f"{self.doctor_id}:{self.patient_id}:{self.diagnosis or ''}:{self.prescription or ''}"
+            hmac_instance = HMAC(HMAC_KEY)
+            return hmac_instance.verify(data, self.data_hmac)
         except Exception as e:
             print(f"Error verifying diagnosis HMAC: {e}")
             return False

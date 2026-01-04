@@ -2,11 +2,11 @@
 Password Hashing Module
 SPHERE - Secure Patient Health Record System
 
-Uses SHA256 with salt for password hashing
+Uses custom SHA256 implementation (from scratch) with salt for password hashing
 """
 
-import hashlib
 import secrets
+from app.crypto.mac import SHA256
 
 
 class PasswordManager:
@@ -19,17 +19,25 @@ class PasswordManager:
     
     @staticmethod
     def hash_password(password: str) -> str:
-        """Hash password with SHA256 and salt"""
+        """Hash password with custom SHA256 implementation and salt"""
         salt = PasswordManager.generate_salt()
-        password_hash = hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
+        sha256 = SHA256()
+        password_hash = sha256.hash_hex(salt + password)
         return f"{salt}${password_hash}"
     
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        """Verify password against hash"""
+        """Verify password against hash using custom SHA256"""
         try:
             salt, stored_hash = hashed_password.split('$')
-            computed_hash = hashlib.sha256((salt + plain_password).encode('utf-8')).hexdigest()
-            return computed_hash == stored_hash
+            sha256 = SHA256()
+            computed_hash = sha256.hash_hex(salt + plain_password)
+            # Constant-time comparison to prevent timing attacks
+            if len(computed_hash) != len(stored_hash):
+                return False
+            result = 0
+            for a, b in zip(computed_hash, stored_hash):
+                result |= ord(a) ^ ord(b)
+            return result == 0
         except Exception:
             return False

@@ -1,7 +1,7 @@
 """
 Authentication Routers for SPHERE
 """
-import hashlib
+from app.crypto.mac import SHA256
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import timedelta
@@ -138,8 +138,9 @@ async def register_patient(data: PatientRegister, db: Session = Depends(get_db))
 async def login(data: UserLogin, db: Session = Depends(get_db)):
     """Login user - returns 2FA requirement if needed"""
     
-    # Hash email for search
-    email_hash = hashlib.sha256(data.email.encode()).hexdigest()
+    # Hash email for search using custom SHA256
+    sha256 = SHA256()
+    email_hash = sha256.hash_hex(data.email)
     print(f"\n🔍 Login attempt for email: {data.email}")
     print(f"🔍 Email hash: {email_hash}")
     
@@ -284,8 +285,9 @@ async def forgot_password_request(data: ForgotPasswordRequest, db: Session = Dep
     Uses the same 2FA OTP system for verification.
     """
     
-    # Hash email for search
-    email_hash = hashlib.sha256(data.email.encode()).hexdigest()
+    # Hash email for search using custom SHA256
+    sha256 = SHA256()
+    email_hash = sha256.hash_hex(data.email)
     user = db.query(User).filter(User.email_hash == email_hash).first()
     
     if not user:

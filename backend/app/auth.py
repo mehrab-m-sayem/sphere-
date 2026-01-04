@@ -1,7 +1,7 @@
 """
 Authentication Routers for SPHERE
 """
-import hashlib
+from app.crypto.mac import SHA256
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import timedelta
@@ -33,15 +33,10 @@ def get_role_for_registration(db: Session):
     return "admin" if user_count == 0 else None
 
 def hash_for_search(value: str) -> str:
-    """Create hash for search indexing"""
-    import hashlib
-    return hashlib.sha256(value.encode()).hexdigest()
+    """Create hash for search indexing using custom SHA256"""
+    sha256 = SHA256()
+    return sha256.hash_hex(value)
 
-
-
-def hash_for_search(value: str) -> str:
-    """Create hash for search indexing"""
-    return hashlib.sha256(value.encode()).hexdigest()
 
 @router.post("/register/doctor", response_model=UserResponse)
 async def register_doctor(data: DoctorRegister, db: Session = Depends(get_db)):
@@ -174,8 +169,9 @@ async def register_patient(data: PatientRegister, db: Session = Depends(get_db))
 async def login(data: UserLogin, db: Session = Depends(get_db)):
     """Login user - returns 2FA requirement if needed"""
     
-    # Hash email for search
-    email_hash = hashlib.sha256(data.email.encode()).hexdigest()
+    # Hash email for search using custom SHA256
+    sha256 = SHA256()
+    email_hash = sha256.hash_hex(data.email)
     user = db.query(User).filter(User.email_hash == email_hash).first()
     
     if not user or not password_manager.verify_password(data.password, user.hashed_password):
