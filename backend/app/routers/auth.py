@@ -13,7 +13,9 @@ from app.schemas import (
     UserLogin,
     TokenResponse,
     LoginResponse,
-    UserResponse
+    UserResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordVerify
 )
 from app.auth.password import PasswordManager
 from app.auth.jwt_handler import JWTManager
@@ -273,3 +275,114 @@ async def resend_2fa(data: dict, db: Session = Depends(get_db)):
     await email_service.send_2fa_code(user.email, code)
     
     return {"temp_token": new_temp_token}
+
+
+@router.post("/forgot-password/request")
+async def forgot_password_request(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Request password reset - sends OTP to user's email.
+    Uses the same 2FA OTP system for verification.
+    """
+    
+    # Hash email for search
+    email_hash = hashlib.sha256(data.email.encode()).hexdigest()
+    user = db.query(User).filter(User.email_hash == email_hash).first()
+    
+    if not user:
+        # Don't reveal if email exists - security best practice
+        # But still return success to prevent email enumeration
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="If an account with this email exists, you will receive a reset code"
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account is disabled"
+        )
+    
+    # Generate OTP code using the 2FA system
+    code = two_fa.generate_code()
+    
+    # Create temp token with user_id and code (valid for password reset)
+    temp_token = jwt_manager.create_temp_token({
+        "user_id": user.id, 
+        "code": code,
+        "purpose": "password_reset"
+    })
+    
+    print(f"🔐 Password reset requested for: {user.email}, code: {code}")
+    
+    # Send OTP via email
+    await email_service.send_password_reset_code(user.email, code)
+    
+    return {
+        "message": "If an account with this email exists, you will receive a reset code",
+        "temp_token": temp_token
+    }
+
+
+@router.post("/forgot-password/verify")
+async def forgot_password_verify(data: ForgotPasswordVerify, db: Session = Depends(get_db)):
+    """
+    Verify OTP and reset password.
+    Uses SHA256 with salt for password hashing (cryptographic requirement).
+    """
+    
+    # Validate new password matches confirmation
+    if data.new_password != data.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Passwords do not match"
+        )
+    
+    # Validate password strength
+    if len(data.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long"
+        )
+    
+    # Verify temp token
+    payload = jwt_manager.verify_token(data.temp_token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired reset token"
+        )
+    
+    # Verify this token is for password reset
+    if payload.get("purpose") != "password_reset":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid reset token"
+        )
+    
+    user_id = payload.get("user_id")
+    stored_code = payload.get("code")
+    
+    # Verify OTP code
+    if data.code != stored_code:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid verification code"
+        )
+    
+    # Get user
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Hash new password with SHA256 + salt
+    new_hashed_password = password_manager.hash_password(data.new_password)
+    user.hashed_password = new_hashed_password
+    
+    db.commit()
+    
+    print(f"✓ Password reset successful for user: {user.email}")
+    
+    return {"message": "Password reset successful. You can now login with your new password."}

@@ -468,3 +468,195 @@ class Appointment(Base):
                 self.appointment_time_encrypted = ecc.encrypt(value, ecc.public_key)
             except Exception as e:
                 print(f"Error encrypting appointment_time: {e}")
+
+
+class Diagnosis(Base):
+    """
+    Diagnosis Model with Multi-Level Encryption
+    Uses RSA for primary fields and ECC for secondary fields
+    HMAC ensures data integrity
+    """
+    __tablename__ = "diagnoses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Foreign keys (not encrypted - needed for querying)
+    doctor_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    patient_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True, index=True)
+    
+    # Primary encrypted fields using RSA (sensitive medical data)
+    diagnosis_encrypted = Column(Text, nullable=False)  # RSA encrypted - main diagnosis
+    prescription_encrypted = Column(Text, nullable=True)  # RSA encrypted - medications
+    
+    # Secondary encrypted fields using ECC
+    symptoms_encrypted = Column(Text, nullable=True)  # ECC encrypted
+    notes_encrypted = Column(Text, nullable=True)  # ECC encrypted - additional notes
+    
+    # Multi-level encryption field (RSA then ECC) - for highly sensitive data
+    confidential_notes_encrypted = Column(Text, nullable=True)  # Double encrypted
+    
+    # HMAC for data integrity verification
+    data_hmac = Column(String(64), nullable=False)
+    
+    # Timestamps
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    doctor = relationship("User", foreign_keys=[doctor_id], backref="diagnoses_given")
+    patient = relationship("User", foreign_keys=[patient_id], backref="diagnoses_received")
+    appointment = relationship("Appointment", backref="diagnosis")
+    
+    @staticmethod
+    def compute_hmac(doctor_id: int, patient_id: int, diagnosis: str, prescription: str = "") -> str:
+        """
+        Compute HMAC for data integrity verification
+        Uses HMAC-SHA256 to detect unauthorized modifications
+        """
+        data = f"{doctor_id}:{patient_id}:{diagnosis}:{prescription}"
+        return hmac.new(HMAC_KEY, data.encode(), hashlib.sha256).hexdigest()
+    
+    def verify_integrity(self) -> bool:
+        """Verify data integrity using HMAC"""
+        try:
+            computed_hmac = self.compute_hmac(
+                self.doctor_id,
+                self.patient_id,
+                self.diagnosis or "",
+                self.prescription or ""
+            )
+            return hmac.compare_digest(self.data_hmac, computed_hmac)
+        except Exception as e:
+            print(f"Error verifying diagnosis HMAC: {e}")
+            return False
+    
+    # ===== RSA Encrypted Fields (Primary Medical Data) =====
+    
+    @property
+    def diagnosis(self):
+        """Decrypt diagnosis using RSA"""
+        if self.diagnosis_encrypted:
+            try:
+                rsa = User.get_rsa_instance()
+                return rsa.decrypt(self.diagnosis_encrypted, rsa.private_key)
+            except Exception as e:
+                print(f"Error decrypting diagnosis: {e}")
+                return None
+        return None
+    
+    @diagnosis.setter
+    def diagnosis(self, value):
+        """Encrypt diagnosis using RSA"""
+        if value:
+            try:
+                rsa = User.get_rsa_instance()
+                self.diagnosis_encrypted = rsa.encrypt(value, rsa.public_key)
+            except Exception as e:
+                print(f"Error encrypting diagnosis: {e}")
+    
+    @property
+    def prescription(self):
+        """Decrypt prescription using RSA"""
+        if self.prescription_encrypted:
+            try:
+                rsa = User.get_rsa_instance()
+                return rsa.decrypt(self.prescription_encrypted, rsa.private_key)
+            except Exception as e:
+                print(f"Error decrypting prescription: {e}")
+                return None
+        return None
+    
+    @prescription.setter
+    def prescription(self, value):
+        """Encrypt prescription using RSA"""
+        if value:
+            try:
+                rsa = User.get_rsa_instance()
+                self.prescription_encrypted = rsa.encrypt(value, rsa.public_key)
+            except Exception as e:
+                print(f"Error encrypting prescription: {e}")
+    
+    # ===== ECC Encrypted Fields (Secondary Data) =====
+    
+    @property
+    def symptoms(self):
+        """Decrypt symptoms using ECC"""
+        if self.symptoms_encrypted:
+            try:
+                ecc = User.get_ecc_instance()
+                return ecc.decrypt(self.symptoms_encrypted, ecc.private_key)
+            except Exception as e:
+                print(f"Error decrypting symptoms: {e}")
+                return None
+        return None
+    
+    @symptoms.setter
+    def symptoms(self, value):
+        """Encrypt symptoms using ECC"""
+        if value:
+            try:
+                ecc = User.get_ecc_instance()
+                self.symptoms_encrypted = ecc.encrypt(value, ecc.public_key)
+            except Exception as e:
+                print(f"Error encrypting symptoms: {e}")
+    
+    @property
+    def notes(self):
+        """Decrypt notes using ECC"""
+        if self.notes_encrypted:
+            try:
+                ecc = User.get_ecc_instance()
+                return ecc.decrypt(self.notes_encrypted, ecc.private_key)
+            except Exception as e:
+                print(f"Error decrypting diagnosis notes: {e}")
+                return None
+        return None
+    
+    @notes.setter
+    def notes(self, value):
+        """Encrypt notes using ECC"""
+        if value:
+            try:
+                ecc = User.get_ecc_instance()
+                self.notes_encrypted = ecc.encrypt(value, ecc.public_key)
+            except Exception as e:
+                print(f"Error encrypting diagnosis notes: {e}")
+    
+    # ===== Multi-Level Encryption (RSA + ECC) =====
+    
+    @property
+    def confidential_notes(self):
+        """
+        Decrypt confidential notes using multi-level decryption
+        First decrypt ECC layer, then RSA layer
+        """
+        if self.confidential_notes_encrypted:
+            try:
+                ecc = User.get_ecc_instance()
+                rsa = User.get_rsa_instance()
+                # First decrypt ECC layer
+                rsa_encrypted = ecc.decrypt(self.confidential_notes_encrypted, ecc.private_key)
+                # Then decrypt RSA layer
+                return rsa.decrypt(rsa_encrypted, rsa.private_key)
+            except Exception as e:
+                print(f"Error decrypting confidential notes: {e}")
+                return None
+        return None
+    
+    @confidential_notes.setter
+    def confidential_notes(self, value):
+        """
+        Encrypt confidential notes using multi-level encryption
+        First encrypt with RSA, then encrypt result with ECC
+        """
+        if value:
+            try:
+                rsa = User.get_rsa_instance()
+                ecc = User.get_ecc_instance()
+                # First encrypt with RSA
+                rsa_encrypted = rsa.encrypt(value, rsa.public_key)
+                # Then encrypt with ECC
+                self.confidential_notes_encrypted = ecc.encrypt(rsa_encrypted, ecc.public_key)
+            except Exception as e:
+                print(f"Error encrypting confidential notes: {e}")

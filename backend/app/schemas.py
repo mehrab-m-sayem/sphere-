@@ -43,11 +43,33 @@ class UserResponse(BaseModel):
     age: Optional[int]
     sex: Optional[str]
     is_active: bool
+    two_factor_enabled: bool = True
     created_at: datetime
     last_login: Optional[datetime]
 
     class Config:
         from_attributes = True
+
+
+class TwoFactorToggle(BaseModel):
+    enabled: bool
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordVerify(BaseModel):
+    temp_token: str
+    code: str
+    new_password: str
+    confirm_password: str
 
 
 class TokenResponse(BaseModel):
@@ -113,6 +135,60 @@ class AppointmentResponse(BaseModel):
     integrity_verified: bool = True
     created_at: datetime
     updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# ===== Diagnosis Schemas =====
+
+class DiagnosisCreate(BaseModel):
+    """Schema for creating a diagnosis"""
+    patient_id: int
+    appointment_id: Optional[int] = None
+    diagnosis: str
+    prescription: Optional[str] = None
+    symptoms: Optional[str] = None
+    notes: Optional[str] = None
+    confidential_notes: Optional[str] = None  # Multi-level encrypted
+
+
+class DiagnosisUpdate(BaseModel):
+    """Schema for updating a diagnosis"""
+    diagnosis: Optional[str] = None
+    prescription: Optional[str] = None
+    symptoms: Optional[str] = None
+    notes: Optional[str] = None
+    confidential_notes: Optional[str] = None
+
+
+class DiagnosisResponse(BaseModel):
+    """Schema for diagnosis response"""
+    id: int
+    doctor_id: int
+    patient_id: int
+    appointment_id: Optional[int] = None
+    doctor_name: Optional[str] = None
+    patient_name: Optional[str] = None
+    diagnosis: Optional[str]
+    prescription: Optional[str] = None
+    symptoms: Optional[str] = None
+    notes: Optional[str] = None
+    confidential_notes: Optional[str] = None
+    integrity_verified: bool = True
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class PatientListItem(BaseModel):
+    """Schema for patient list visible to doctors"""
+    id: int
+    name: str
+    age: Optional[int] = None
+    sex: Optional[str] = None
     
     class Config:
         from_attributes = True

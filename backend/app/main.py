@@ -13,6 +13,7 @@ load_dotenv()
 from app.database import engine, Base
 from app.routers import auth, users, admin
 from app.routers import appointments
+from app.routers import diagnoses
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -33,6 +34,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(admin.router)
 app.include_router(appointments.router)
+app.include_router(diagnoses.router)
 
 @app.get("/api/health")
 async def health_check():

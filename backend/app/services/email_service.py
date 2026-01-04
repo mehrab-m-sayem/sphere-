@@ -115,3 +115,33 @@ class EmailService:
         """
         
         return await self.send_email(to_email, subject, body_text, body_html)
+
+    async def send_password_reset_code(self, to_email: str, code: str) -> bool:
+        """
+        Send password reset OTP code via email
+        
+        Args:
+            to_email: Recipient email
+            code: 6-digit verification code
+        
+        Returns:
+            True if successful
+        """
+        subject = "SPHERE - Password Reset Code"
+        body_text = f"Your password reset code is: {code}\n\nThis code expires in 5 minutes.\n\nIf you didn't request this, please ignore this email and your password will remain unchanged."
+        body_html = f"""
+        <html>
+            <body>
+                <h2>SPHERE Password Reset</h2>
+                <p>You requested to reset your password. Your verification code is:</p>
+                <h1 style="font-family: monospace; color: #667eea;">{code}</h1>
+                <p>This code expires in 5 minutes.</p>
+                <hr>
+                <p style="color: #999; font-size: 12px;">
+                    If you didn't request this password reset, please ignore this email and your password will remain unchanged.
+                </p>
+            </body>
+        </html>
+        """
+        
+        return await self.send_email(to_email, subject, body_text, body_html)

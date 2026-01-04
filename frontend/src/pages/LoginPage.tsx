@@ -93,6 +93,15 @@ const LoginPage: React.FC = () => {
           </button>
         </form>
 
+        <div className="mt-4 text-center">
+          <button
+            onClick={() => navigate('/forgot-password')}
+            className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+          >
+            Forgot Password?
+          </button>
+        </div>
+
         <div className="mt-6 text-center">
           <div className="text-gray-600 text-sm">
             Don't have an account?{' '}
