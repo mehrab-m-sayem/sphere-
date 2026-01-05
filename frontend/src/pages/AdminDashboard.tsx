@@ -206,12 +206,14 @@ const AdminDashboard: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => toggleUserStatus(user.id)}
-                            className="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 transition"
-                          >
-                            {user.is_active ? 'Deactivate' : 'Activate'}
-                          </button>
+                          {user.role !== 'admin' && (
+                            <button
+                              onClick={() => toggleUserStatus(user.id)}
+                              className="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 transition"
+                            >
+                              {user.is_active ? 'Deactivate' : 'Activate'}
+                            </button>
+                          )}
                           {user.role !== 'admin' && (
                             <button
                               onClick={() => deleteUser(user.id)}
@@ -219,6 +221,9 @@ const AdminDashboard: React.FC = () => {
                             >
                               Delete
                             </button>
+                          )}
+                          {user.role === 'admin' && (
+                            <span className="text-xs text-gray-500 italic">Protected account</span>
                           )}
                         </div>
                       </td>
