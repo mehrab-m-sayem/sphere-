@@ -1,9 +1,6 @@
 """
-HMAC (Hash-based Message Authentication Code) Implementation from Scratch
-SPHERE - Secure Patient Health Record System
-
+HMAC (Hash-based Message Authentication Code) Implementation
 Implements HMAC-SHA256 according to RFC 2104
-All cryptographic primitives implemented from scratch - no built-in crypto libraries used
 """
 
 from typing import Union
@@ -395,6 +392,24 @@ class CBCMAC:
         return result == 0
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ================================================
 def test_sha256():
     """Test SHA-256 implementation against known test vectors"""
     print("Testing SHA-256 Implementation...")

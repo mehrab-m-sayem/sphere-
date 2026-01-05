@@ -141,16 +141,16 @@ async def login(data: UserLogin, db: Session = Depends(get_db)):
     # Hash email for search using custom SHA256
     sha256 = SHA256()
     email_hash = sha256.hash_hex(data.email)
-    print(f"\n🔍 Login attempt for email: {data.email}")
-    print(f"🔍 Email hash: {email_hash}")
+    print(f"\n Login attempt for email: {data.email}")
+    print(f" Email hash: {email_hash}")
     
     user = db.query(User).filter(User.email_hash == email_hash).first()
     
     if not user:
-        print(f"❌ User not found with email hash: {email_hash}")
+        print(f" User not found with email hash: {email_hash}")
         # Try to find all users for debugging
         all_users = db.query(User).all()
-        print(f"📊 Total users in DB: {len(all_users)}")
+        print(f" Total users in DB: {len(all_users)}")
         for u in all_users:
             print(f"   - Email hash in DB: {u.email_hash}, Decrypted email: {u.email}")
         
@@ -159,12 +159,12 @@ async def login(data: UserLogin, db: Session = Depends(get_db)):
             detail="Invalid email or password"
         )
     
-    print(f"✓ User found: {user.email}")
+    print(f" User found: {user.email}")
     
     # Verify password
     password_match = password_manager.verify_password(data.password, user.hashed_password)
-    print(f"🔐 Password match: {password_match}")
-    print(f"🔐 Stored hash: {user.hashed_password[:50]}...")
+    print(f" Password match: {password_match}")
+    print(f" Stored hash: {user.hashed_password[:50]}...")
     
     if not password_match:
         print(f"Password mismatch for user: {user.email}")

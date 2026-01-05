@@ -107,7 +107,7 @@ async def change_password(
     db.commit()
     db.refresh(current_user)
     
-    print(f"✓ Password changed for user: {current_user.email}")
+    print(f"Password changed for user: {current_user.email}")
     
     return current_user
 
@@ -125,6 +125,6 @@ async def toggle_two_factor(
     db.refresh(current_user)
     
     status_text = "enabled" if data.enabled else "disabled"
-    print(f"✓ 2FA {status_text} for user: {current_user.email}")
+    print(f"2FA {status_text} for user: {current_user.email}")
     
     return current_user

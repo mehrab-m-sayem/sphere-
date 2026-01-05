@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 
 
-# HMAC key for Message Authentication Codes (used with custom HMAC implementation)
+# HMAC key for Message Authentication Codes 
 HMAC_KEY = os.getenv("HMAC_SECRET_KEY", "sphere-hmac-secret-key-change-in-production")
 
 # Custom SHA256 instance for hashing (search indexes)

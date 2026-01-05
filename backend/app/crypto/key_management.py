@@ -355,43 +355,43 @@ def test_key_management():
     # Save keys
     success = km.save_keys(user_id, keys)
     assert success, "Failed to save keys"
-    print("✓ Keys saved successfully")
+    print("Keys saved successfully")
     
     # Load public keys
     public_keys = km.load_public_keys(user_id)
     assert public_keys is not None, "Failed to load public keys"
-    print("✓ Public keys loaded successfully")
+    print("Public keys loaded successfully")
     
     # Load private keys
     private_keys = km.load_private_keys(user_id)
     assert private_keys is not None, "Failed to load private keys"
-    print("✓ Private keys loaded successfully")
+    print("Private keys loaded successfully")
     
     # Test key retrieval
     rsa_pub = km.get_rsa_public_key(user_id)
     assert rsa_pub is not None, "Failed to get RSA public key"
-    print(f"✓ RSA Public Key: (e={rsa_pub[0]}, n={rsa_pub[1][:50]}...)")
+    print(f"RSA Public Key: (e={rsa_pub[0]}, n={rsa_pub[1][:50]}...)")
     
     # Check expiration
     is_expired = km.check_key_expiration(user_id)
-    print(f"✓ Keys expired: {is_expired}")
+    print(f"Keys expired: {is_expired}")
     
     # List users
     users = km.list_users_with_keys()
-    print(f"✓ Users with keys: {users}")
+    print(f"Users with keys: {users}")
     
     # Clean up test keys
     km.delete_keys(user_id)
-    print("✓ Test keys deleted")
+    print("Test keys deleted")
     
     # Test system master key
     print("\nTesting System Master Key...")
     skm = SystemKeyManager(storage_path="test_keys")
     master_key = skm.load_master_key()
     assert master_key is not None, "Failed to load master key"
-    print("✓ Master key loaded/generated")
+    print("Master key loaded/generated")
     
-    print("\n✓ All key management tests passed!")
+    print("\nAll key management tests passed!")
 
 
 if __name__ == "__main__":

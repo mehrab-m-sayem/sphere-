@@ -1,6 +1,5 @@
 """
 Two-Factor Authentication Module
-SPHERE - Secure Patient Health Record System
 """
 
 import random

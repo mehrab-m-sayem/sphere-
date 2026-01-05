@@ -155,7 +155,7 @@ async def create_diagnosis(
     db.commit()
     db.refresh(diagnosis)
     
-    print(f"✅ Diagnosis created by Dr. {current_user.id} for patient {patient.id}")
+    print(f"Diagnosis created by Dr. {current_user.id} for patient {patient.id}")
     
     return build_diagnosis_response(diagnosis, db)
 

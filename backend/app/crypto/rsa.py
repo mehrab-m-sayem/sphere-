@@ -1,6 +1,5 @@
 """
-RSA Encryption Implementation from Scratch
-SPHERE - Secure Patient Health Record System
+RSA Encryption Implementation 
 """
 
 import random

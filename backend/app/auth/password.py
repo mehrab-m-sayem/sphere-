@@ -1,8 +1,6 @@
 """
 Password Hashing Module
-SPHERE - Secure Patient Health Record System
-
-Uses custom SHA256 implementation (from scratch) with salt for password hashing
+Uses custom SHA256 implementation with salt for password hashing
 """
 
 import secrets
